@@ -841,13 +841,27 @@
     state.running = false;
     if (state.phaseType === "break") {
       state.phaseType = "level";
-    } else if (state.phaseType === "done") {
-      state.currentLevelIdx = state.levels.length - 1;
-      state.phaseType = "level";
-    } else if (state.currentLevelIdx > 0) {
-      state.currentLevelIdx -= 1;
+      state.remaining = state.levelLen;
+      renderClock();
+      return;
     }
-    state.remaining = state.levelLen;
+    const idx = state.phaseType === "done" ? state.levels.length : state.currentLevelIdx;
+    if (idx <= 0) {
+      state.currentLevelIdx = 0;
+      state.phaseType = "level";
+      state.remaining = state.levelLen;
+      renderClock();
+      return;
+    }
+    const prevIdx = idx - 1;
+    state.currentLevelIdx = prevIdx;
+    if (isBreakLevel(prevIdx)) {
+      state.phaseType = "break";
+      state.remaining = state.breakLen;
+    } else {
+      state.phaseType = "level";
+      state.remaining = state.levelLen;
+    }
     renderClock();
   };
   $("skipBtn").onclick = () => { if (state.phaseType === "done") return; stopTicking(); state.running = false; state.remaining = 0; advancePhase(); };
