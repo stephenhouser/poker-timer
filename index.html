@@ -194,6 +194,9 @@
       <button class="icon-btn" id="fsBtn" title="Fullscreen" aria-label="Toggle fullscreen">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
       </button>
+      <button class="icon-btn" id="newTourneyBtn" title="New tournament" aria-label="Start a new tournament" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15.3-6.4M21 12a9 9 0 0 1-15.3 6.4"/><path d="M18 3v4h-4M6 21v-4h4"/></svg>
+      </button>
       <button class="icon-btn" id="settingsBtn" title="Settings" aria-label="Edit settings" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
@@ -213,11 +216,11 @@
       <div class="grid2">
         <div class="field">
           <label for="buyIn">Buy-in ($)</label>
-          <input type="number" id="buyIn" min="0" step="1" value="20">
+          <input type="number" id="buyIn" min="0" step="1" value="40">
         </div>
         <div class="field">
           <label for="startStack">Starting stack (chips)</label>
-          <input type="number" id="startStack" min="100" step="100" value="10000">
+          <input type="number" id="startStack" min="100" step="100" value="20000">
         </div>
       </div>
     </div>
@@ -275,11 +278,11 @@
         <div class="grid2">
           <div class="field">
             <label for="rebuyCost">Rebuy cost ($)</label>
-            <input type="number" id="rebuyCost" min="0" step="1" value="20">
+            <input type="number" id="rebuyCost" min="0" step="1" value="40">
           </div>
           <div class="field">
             <label for="rebuyStack">Rebuy stack (chips)</label>
-            <input type="number" id="rebuyStack" min="100" step="100" value="10000">
+            <input type="number" id="rebuyStack" min="100" step="100" value="20000">
           </div>
         </div>
         <div class="field" style="margin-bottom:0;">
@@ -460,15 +463,15 @@
   // ---------- state ----------
   const state = {
     name: "Poker Tournament Timer",
-    buyIn: 20,
-    startStack: 10000,
+    buyIn: 40,
+    startStack: 20000,
     levelLen: 15*60,
     breakEvery: 4,
     breakLen: 10*60,
     levels: generateLevels(12),
     rebuyEnabled: true,
-    rebuyCost: 20,
-    rebuyStack: 10000,
+    rebuyCost: 40,
+    rebuyStack: 20000,
     rebuyCutoff: 6,
     players: [],
     places: 3,
@@ -655,6 +658,7 @@
     $("setupFlow").hidden = true;
     $("liveFlow").hidden = false;
     $("settingsBtn").hidden = false;
+    $("newTourneyBtn").hidden = false;
     document.querySelector(".wrap").classList.add("is-live");
     state.currentLevelIdx = 0;
     state.phaseType = "level";
@@ -670,9 +674,54 @@
     stopTicking(); state.running = false;
     $("liveFlow").hidden = true;
     $("setupFlow").hidden = false;
+    $("newTourneyBtn").hidden = true;
     document.querySelector(".wrap").classList.remove("is-live");
     renderPlayerList(); renderPoolPreview(); renderPayoutRows();
   };
+
+  // ---------- new tournament (reset players + progress, keep configured structure) ----------
+  let newTourneyArmed = false;
+  let newTourneyTimeout = null;
+  $("newTourneyBtn").onclick = () => {
+    if (!newTourneyArmed) {
+      newTourneyArmed = true;
+      $("newTourneyBtn").title = "Click again to confirm — clears players & progress";
+      $("newTourneyBtn").style.color = "var(--danger)";
+      $("newTourneyBtn").style.borderColor = "var(--danger)";
+      clearTimeout(newTourneyTimeout);
+      newTourneyTimeout = setTimeout(() => {
+        newTourneyArmed = false;
+        $("newTourneyBtn").title = "New tournament";
+        $("newTourneyBtn").style.color = "";
+        $("newTourneyBtn").style.borderColor = "";
+      }, 3000);
+      return;
+    }
+    // confirmed
+    clearTimeout(newTourneyTimeout);
+    newTourneyArmed = false;
+    $("newTourneyBtn").title = "New tournament";
+    $("newTourneyBtn").style.color = "";
+    $("newTourneyBtn").style.borderColor = "";
+    resetTournament();
+  };
+  function resetTournament() {
+    stopTicking();
+    state.running = false;
+    state.players = [];
+    state.currentLevelIdx = 0;
+    state.phaseType = "level";
+    state.remaining = state.levelLen;
+    save();
+    $("liveFlow").hidden = true;
+    $("setupFlow").hidden = false;
+    $("newTourneyBtn").hidden = true;
+    document.querySelector(".wrap").classList.remove("is-live");
+    switchTab("players");
+    renderPlayerList();
+    renderPoolPreview();
+    renderPayoutRows();
+  }
 
   // =========================================================
   // LIVE SCREEN
