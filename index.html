@@ -29,7 +29,7 @@
   * { box-sizing: border-box; }
   html { scroll-padding-top: env(safe-area-inset-top, 0px); height: 100%; }
   body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: "Archivo", -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
-  .wrap { max-width: 760px; margin: 0 auto; padding: 24px 18px 56px; display: flex; flex-direction: column; gap: 18px; transition: max-width .2s ease; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 6px 6px 28px; display: flex; flex-direction: column; gap: 18px; transition: max-width .2s ease; }
   .wrap.is-live { max-width: 1180px; }
   #setupFlow, #liveFlow { display: flex; flex-direction: column; gap: 18px; width: 100%; }
   #setupFlow { max-width: 640px; margin: 0 auto; }
@@ -48,8 +48,8 @@
 
   @media (min-width: 980px) {
     #liveFlow { flex-direction: row; align-items: flex-start; gap: 20px; }
-    #liveFlow .display-card { flex: 1 1 50%; position: sticky; top: 18px; }
-    #liveFlow .side-card { flex: 1 1 50%; min-width: 0; }
+    #liveFlow .display-card { flex: 1 1 65%; position: sticky; top: 18px; }
+    #liveFlow .side-card { flex: 1 1 35%; min-width: 0; }
     #livePlayersList, #livePayoutsList { max-height: 46vh; overflow-y: auto; padding-right: 4px; }
   }
   .card h2 { margin: 0 0 4px; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
@@ -123,10 +123,9 @@
   @media (prefers-reduced-motion: reduce) { .clock.critical { animation: none; } }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
 
-  .blinds-row { display: flex; justify-content: center; gap: 26px; margin: 10px 0 18px; flex-wrap: wrap; }
-  .blind-stat { text-align: center; }
-  .blind-stat .num { font-family: "Space Mono", monospace; font-size: 38px; font-weight: 700; }
-  .blind-stat .lbl { font-size: 11.5px; color: var(--text-dim); letter-spacing: 0.05em; margin-top: 3px; }
+  .blinds-row { display: flex; align-items: baseline; justify-content: center; gap: 22px; margin: 4px 0 18px; flex-wrap: wrap; }
+  .blinds-main { font-family: "Space Mono", monospace; font-weight: 700; font-size: 68px; line-height: 1; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; color: var(--text); }
+  .blinds-main .slash { color: var(--text-dim); font-weight: 400; margin: 0 10px; }
   .next-level { font-size: 12.5px; color: var(--text-dim); margin-bottom: 20px; }
   .next-level b { color: var(--text); }
 
@@ -339,9 +338,7 @@
       <div class="clock" id="clock" aria-live="polite">15:00</div>
 
       <div class="blinds-row" id="blindsRow">
-        <div class="blind-stat"><div class="num" id="sbNum">25</div><div class="lbl">SMALL</div></div>
-        <div class="blind-stat"><div class="num" id="bbNum">50</div><div class="lbl">BIG</div></div>
-        <div class="blind-stat"><div class="num" id="anteNum">0</div><div class="lbl">ANTE</div></div>
+        <div class="blinds-main"><span id="sbNum">25</span><span class="slash">/</span><span id="bbNum">50</span></div>
       </div>
       <div class="next-level" id="nextLevelText">Next: 50 / 100</div>
 
@@ -773,11 +770,10 @@
 
       $("sbNum").textContent = lvl.sb.toLocaleString();
       $("bbNum").textContent = lvl.bb.toLocaleString();
-      $("anteNum").textContent = lvl.ante.toLocaleString();
 
       const next = state.levels[state.currentLevelIdx+1];
       $("nextLevelText").innerHTML = next
-        ? "Next: <b>" + next.sb.toLocaleString() + " / " + next.bb.toLocaleString() + (next.ante ? " (ante " + next.ante.toLocaleString() + ")" : "") + "</b>"
+        ? "Next: <b>" + next.sb.toLocaleString() + " / " + next.bb.toLocaleString() + "</b>"
         : "Final level";
     }
     buildPips();
