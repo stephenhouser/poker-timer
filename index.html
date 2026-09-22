@@ -106,6 +106,7 @@
   .phase-label.play .dot { background: var(--accent); }
   .phase-label.done .dot { background: var(--text-dim); }
   .phase-label.critical .dot { background: var(--danger); }
+  .winner-banner { font-size: 15px; font-weight: 800; color: var(--accent); margin-bottom: 14px; }
   .clock { font-family: "Space Mono", monospace; font-weight: 700; font-size: clamp(56px, 15vw, 104px); line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--accent); margin: 0 0 4px; }
   .clock.break { color: var(--teal); }
   .clock.critical { color: var(--danger); animation: pulse 1s ease-in-out infinite; }
@@ -317,6 +318,7 @@
   <section id="liveFlow" hidden>
 
     <div class="display-card">
+      <div class="winner-banner" id="winnerBanner" hidden>🏆 <span id="winnerName"></span> wins the tournament</div>
       <div class="phase-label play" id="phaseLabel">
         <span class="dot" aria-hidden="true"></span>
         <span id="phaseText">Level 1 · In play</span>
@@ -374,6 +376,10 @@
           <div class="lbl" id="poolLbl">prize pool</div>
         </div>
         <div id="livePayoutsList"></div>
+        <div id="standingsWrap" hidden style="margin-top:18px;">
+          <div class="section-title" style="margin-top:0;">Standings</div>
+          <div id="standingsList"></div>
+        </div>
       </div>
     </div>
 
@@ -583,7 +589,7 @@
   function addPlayerFromInput(inputEl) {
     const name = inputEl.value.trim();
     if (!name) return;
-    state.players.push({id: uid(), name: name, status: "active", rebuys: 0});
+    state.players.push({id: uid(), name: name, status: "active", rebuys: 0, place: null});
     inputEl.value = "";
     renderPlayerList(); renderPoolPreview();
     if (!$("liveFlow").hidden) renderLivePlayers();
@@ -684,12 +690,16 @@
 
     if (state.phaseType === "done") {
       phaseLabel.classList.add("done");
-      phaseText.textContent = "Tournament complete";
+      const winner = state.players.find(p => p.place === 1);
+      phaseText.textContent = winner ? "Tournament complete" : "Tournament complete";
+      $("winnerBanner").hidden = !winner;
+      if (winner) $("winnerName").textContent = winner.name;
       clock.textContent = "00:00";
       $("blindsRow").style.opacity = "0.35";
-      $("nextLevelText").textContent = "All levels finished.";
+      $("nextLevelText").textContent = winner ? "Head to the Payouts tab for the final split." : "All levels finished.";
       $("playPauseBtn").disabled = true; $("skipBtn").disabled = true;
     } else {
+      $("winnerBanner").hidden = true;
       $("playPauseBtn").disabled = false; $("skipBtn").disabled = false;
       $("blindsRow").style.opacity = "1";
       const critical = state.remaining <= 10 && state.remaining > 0;
@@ -771,16 +781,34 @@
   $("plus1").onclick = () => adjustTime(60);
 
   // ---------- tabs ----------
+  function switchTab(name) {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+    state.activeTab = name;
+    $("tabPlayers").hidden = name !== "players";
+    $("tabPayouts").hidden = name !== "payouts";
+    if (name === "payouts") renderLivePayouts();
+  }
   document.querySelectorAll(".tab-btn").forEach(btn => {
-    btn.onclick = () => {
-      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      state.activeTab = btn.dataset.tab;
-      $("tabPlayers").hidden = state.activeTab !== "players";
-      $("tabPayouts").hidden = state.activeTab !== "payouts";
-      if (state.activeTab === "payouts") renderLivePayouts();
-    };
+    btn.onclick = () => switchTab(btn.dataset.tab);
   });
+
+  // ---------- finishing the tournament ----------
+  function checkTournamentEnd() {
+    if (state.phaseType === "done") return;
+    const activePlayers = state.players.filter(p => p.status === "active");
+    if (state.players.length >= 2 && activePlayers.length === 1) {
+      finishTournament(activePlayers[0]);
+    }
+  }
+  function finishTournament(winner) {
+    winner.place = 1;
+    state.phaseType = "done";
+    state.running = false;
+    stopTicking();
+    save();
+    renderClock();
+    switchTab("payouts");
+  }
 
   // ---------- live players ----------
   function renderLivePlayers() {
@@ -789,35 +817,51 @@
     if (!state.players.length) {
       list.innerHTML = '<p class="count-note">No players added yet.</p>';
     }
-    state.players.forEach(p => {
+    const ordered = state.players.slice().sort((a, b) => {
+      if (a.status !== b.status) return a.status === "active" ? -1 : 1;
+      if (a.status === "busted") return (a.place || 999) - (b.place || 999);
+      return 0;
+    });
+    ordered.forEach(p => {
       const row = document.createElement("div");
       row.className = "player-row";
       const canRebuy = state.rebuyEnabled && p.status === "busted" && (state.currentLevelIdx+1) <= state.rebuyCutoff && state.phaseType !== "done";
       const paid = state.buyIn + p.rebuys * state.rebuyCost;
       const metaBits = [money(paid) + " paid"];
       if (p.rebuys) metaBits.push(p.rebuys + " rebuy" + (p.rebuys>1?"s":""));
+      if (p.status === "busted" && p.place) metaBits.push("finished " + ordinal(p.place));
       row.innerHTML =
         '<div style="flex:1;text-align:left;">' +
-          '<div class="pname">' + escapeHtml(p.name) + '</div>' +
+          '<div class="pname">' + escapeHtml(p.name) + (p.place === 1 ? " 🏆" : "") + '</div>' +
           '<div class="pmeta">' + metaBits.join(" · ") + '</div>' +
         '</div>' +
         '<span class="status-pill ' + p.status + '">' + (p.status === "active" ? "Active" : "Busted") + '</span>' +
         '<div class="player-actions"></div>';
       const actions = row.querySelector(".player-actions");
-      if (p.status === "active") {
+      if (p.status === "active" && state.phaseType !== "done") {
         const bustBtn = document.createElement("button");
         bustBtn.className = "small-btn"; bustBtn.textContent = "Bust";
-        bustBtn.onclick = () => { p.status = "busted"; save(); renderLivePlayers(); renderLivePayouts(); };
+        bustBtn.onclick = () => {
+          p.status = "busted";
+          const stillActive = state.players.filter(x => x.status === "active").length;
+          p.place = stillActive + 1;
+          save(); renderLivePlayers(); renderLivePayouts();
+          checkTournamentEnd();
+        };
         actions.appendChild(bustBtn);
       } else if (canRebuy) {
         const rebuyBtn = document.createElement("button");
         rebuyBtn.className = "small-btn"; rebuyBtn.textContent = "Rebuy";
-        rebuyBtn.onclick = () => { p.status = "active"; p.rebuys += 1; save(); renderLivePlayers(); renderLivePayouts(); };
+        rebuyBtn.onclick = () => { p.status = "active"; p.rebuys += 1; p.place = null; save(); renderLivePlayers(); renderLivePayouts(); };
         actions.appendChild(rebuyBtn);
       }
       const rmBtn = document.createElement("button");
       rmBtn.className = "small-btn"; rmBtn.textContent = "×"; rmBtn.setAttribute("aria-label","Remove player");
-      rmBtn.onclick = () => { state.players = state.players.filter(x => x.id !== p.id); save(); renderLivePlayers(); renderLivePayouts(); };
+      rmBtn.onclick = () => {
+        state.players = state.players.filter(x => x.id !== p.id);
+        save(); renderLivePlayers(); renderLivePayouts();
+        checkTournamentEnd();
+      };
       actions.appendChild(rmBtn);
       list.appendChild(row);
     });
@@ -839,14 +883,38 @@
     const list = $("livePayoutsList");
     list.innerHTML = "";
     state.payoutPercents.forEach((pct, i) => {
+      const place = i + 1;
+      const holder = state.players.find(p => p.place === place);
       const row = document.createElement("div");
       row.className = "payout-list-row";
       row.innerHTML =
-        '<span class="place">' + ordinal(i+1) + '</span>' +
-        '<span class="pct">' + pct + '%</span>' +
+        '<span class="place">' + ordinal(place) + '</span>' +
+        '<span class="pct">' + (holder ? escapeHtml(holder.name) + " · " : "") + pct + '%</span>' +
         '<span class="amt">' + money(pool*pct/100) + '</span>';
       list.appendChild(row);
     });
+
+    const standingsWrap = $("standingsWrap");
+    const standingsList = $("standingsList");
+    const finishers = state.players.filter(p => p.place).sort((a,b) => a.place - b.place);
+    if (!finishers.length) {
+      standingsWrap.hidden = true;
+    } else {
+      standingsWrap.hidden = false;
+      standingsList.innerHTML = "";
+      finishers.forEach(p => {
+        const inMoney = p.place <= state.places;
+        const row = document.createElement("div");
+        row.className = "payout-list-row";
+        row.innerHTML =
+          '<span class="place">' + ordinal(p.place) + '</span>' +
+          '<span class="pct">' + escapeHtml(p.name) + (p.place === 1 ? " 🏆" : "") + '</span>' +
+          '<span class="amt" style="' + (inMoney ? "" : "color:var(--text-dim);font-weight:400;") + '">' +
+            (inMoney ? money(pool * (state.payoutPercents[p.place-1]||0) / 100) : "—") +
+          '</span>';
+        standingsList.appendChild(row);
+      });
+    }
   }
 
   // ---------- theme ----------
