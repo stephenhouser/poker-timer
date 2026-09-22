@@ -111,7 +111,7 @@
 
   /* display */
   .display-card { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 20px; padding: 30px 22px 22px; text-align: center; position: relative; }
-  .phase-label { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; letter-spacing: 0.03em; color: var(--text-dim); margin-bottom: 14px; }
+  .phase-label { display: inline-flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 700; letter-spacing: 0.03em; color: var(--text-dim); margin-bottom: 14px; }
   .phase-label .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--teal); }
   .phase-label.play .dot { background: var(--accent); }
   .phase-label.done .dot { background: var(--text-dim); }
@@ -124,8 +124,9 @@
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
 
   .blinds-row { display: flex; align-items: baseline; justify-content: center; gap: 22px; margin: 4px 0 18px; flex-wrap: wrap; }
-  .blinds-main { font-family: "Space Mono", monospace; font-weight: 700; font-size: 138px; line-height: 1; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; color: var(--text); }
+  .blinds-main { font-family: "Space Mono", monospace; font-weight: 700; font-size: 84px; line-height: 1; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; color: var(--text); }
   .blinds-main .slash { color: var(--text-dim); font-weight: 400; margin: 0 10px; }
+  .blinds-main.break-text { color: var(--teal); letter-spacing: 0.04em; }
   .next-level { font-size: 44px; color: var(--text-dim); margin-bottom: 20px; }
   .next-level b { color: var(--text); }
 
@@ -349,6 +350,7 @@
           <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>
           <span id="playPauseLabel">Start</span>
         </button>
+        <button class="ctrl-btn ghost" id="backBtn">Back a level</button>
         <button class="ctrl-btn" id="skipBtn">Skip level</button>
         <button class="ctrl-btn ghost" id="resetBtn">Reset</button>
       </div>
@@ -768,8 +770,13 @@
       clock.classList.toggle("critical", critical);
       clock.textContent = fmt(state.remaining);
 
-      $("sbNum").textContent = lvl.sb.toLocaleString();
-      $("bbNum").textContent = lvl.bb.toLocaleString();
+      if (isBreak) {
+        $("blindsRow").innerHTML = '<div class="blinds-main break-text">BREAK</div>';
+      } else {
+        $("blindsRow").innerHTML = '<div class="blinds-main"><span id="sbNum"></span><span class="slash">/</span><span id="bbNum"></span></div>';
+        $("sbNum").textContent = lvl.sb.toLocaleString();
+        $("bbNum").textContent = lvl.bb.toLocaleString();
+      }
 
       const next = state.levels[state.currentLevelIdx+1];
       $("nextLevelText").innerHTML = next
@@ -827,6 +834,20 @@
     if (state.phaseType === "done") return;
     state.running = !state.running;
     if (state.running) startTicking(); else stopTicking();
+    renderClock();
+  };
+  $("backBtn").onclick = () => {
+    stopTicking();
+    state.running = false;
+    if (state.phaseType === "break") {
+      state.phaseType = "level";
+    } else if (state.phaseType === "done") {
+      state.currentLevelIdx = state.levels.length - 1;
+      state.phaseType = "level";
+    } else if (state.currentLevelIdx > 0) {
+      state.currentLevelIdx -= 1;
+    }
+    state.remaining = state.levelLen;
     renderClock();
   };
   $("skipBtn").onclick = () => { if (state.phaseType === "done") return; stopTicking(); state.running = false; state.remaining = 0; advancePhase(); };
