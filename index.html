@@ -235,7 +235,7 @@
           <label>Level length</label>
           <div class="stepper">
             <button type="button" id="levelLenDown" aria-label="Shorter level">−</button>
-            <span class="val" id="levelLenVal">15:00</span>
+            <span class="val" id="levelLenVal">20:00</span>
             <button type="button" id="levelLenUp" aria-label="Longer level">+</button>
           </div>
         </div>
@@ -243,7 +243,7 @@
           <label>Break every N levels</label>
           <div class="stepper">
             <button type="button" id="breakEveryDown" aria-label="Fewer levels between breaks">−</button>
-            <span class="val" id="breakEveryVal">4</span>
+            <span class="val" id="breakEveryVal">3</span>
             <button type="button" id="breakEveryUp" aria-label="More levels between breaks">+</button>
           </div>
         </div>
@@ -291,7 +291,7 @@
           <label>Rebuys allowed through level</label>
           <div class="stepper">
             <button type="button" id="cutoffDown" aria-label="Fewer levels">−</button>
-            <span class="val" id="cutoffVal">4</span>
+            <span class="val" id="cutoffVal">3</span>
             <button type="button" id="cutoffUp" aria-label="More levels">+</button>
           </div>
         </div>
@@ -511,14 +511,14 @@
       name: "Poker Tournament Timer",
       buyIn: 40,
       startStack: 20000,
-      levelLen: 15*60,
-      breakEvery: 4,
+      levelLen: 20*60,
+      breakEvery: 3,
       breakLen: 10*60,
       levels: generateLevels(12),
       rebuyEnabled: true,
       rebuyCost: 40,
       rebuyStack: 20000,
-      rebuyCutoff: 4,
+      rebuyCutoff: 3,
       topOffEnabled: true,
       topOffCost: 20,
       topOffChips: 10000,
@@ -532,7 +532,7 @@
     // runtime
     phaseType: "level", // level | break | done
     currentLevelIdx: 0,
-    remaining: 15*60,
+    remaining: 20*60,
     running: false,
     tickHandle: null,
     activeTab: "players"
