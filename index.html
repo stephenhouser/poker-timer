@@ -411,6 +411,9 @@
           <div><div class="n" id="statTopOffs">0</div><div class="l">Top-offs</div></div>
           <div><div class="n" id="statCollected">$0</div><div class="l">Collected</div></div>
         </div>
+        <div style="text-align:center; margin-bottom:14px;">
+          <button class="small-btn" id="undoBtn" disabled>↺ Undo last action</button>
+        </div>
         <div class="add-player-row">
           <input type="text" id="liveNewPlayerName" placeholder="Add a player" maxlength="30">
           <button class="small-btn" id="liveAddPlayerBtn">Add</button>
@@ -535,7 +538,8 @@
     remaining: 20*60,
     running: false,
     tickHandle: null,
-    activeTab: "players"
+    activeTab: "players",
+    undoStack: []
   });
 
   function save() {
@@ -682,6 +686,7 @@
   function addPlayerFromInput(inputEl) {
     const name = inputEl.value.trim();
     if (!name) return;
+    if (!$("liveFlow").hidden) snapshotForUndo();
     state.players.push({id: uid(), name: name, status: "active", rebuys: 0, place: null, toppedOff: false});
     inputEl.value = "";
     renderPlayerList(); renderPoolPreview();
@@ -746,6 +751,7 @@
     state.phaseType = "level";
     state.remaining = state.levelLen;
     state.running = false;
+    state.undoStack = [];
     buildPips();
     renderClock();
     renderLivePlayers();
@@ -818,6 +824,7 @@
     state.currentLevelIdx = 0;
     state.phaseType = "level";
     state.remaining = state.levelLen;
+    state.undoStack = [];
     save();
     $("liveFlow").hidden = true;
     $("setupFlow").hidden = false;
@@ -990,6 +997,37 @@
     btn.onclick = () => switchTab(btn.dataset.tab);
   });
 
+  // ---------- undo ----------
+  function snapshotForUndo() {
+    state.undoStack.push(JSON.stringify({
+      players: state.players,
+      phaseType: state.phaseType,
+      currentLevelIdx: state.currentLevelIdx,
+      remaining: state.remaining
+    }));
+    if (state.undoStack.length > 15) state.undoStack.shift();
+    updateUndoBtn();
+  }
+  function undoLastAction() {
+    if (!state.undoStack.length) return;
+    const snap = JSON.parse(state.undoStack.pop());
+    stopTicking();
+    state.running = false;
+    state.players = snap.players;
+    state.phaseType = snap.phaseType;
+    state.currentLevelIdx = snap.currentLevelIdx;
+    state.remaining = snap.remaining;
+    save();
+    renderClock();
+    renderLivePlayers();
+    renderLivePayouts();
+  }
+  function updateUndoBtn() {
+    const btn = $("undoBtn");
+    if (!btn) return;
+    btn.disabled = state.undoStack.length === 0;
+  }
+
   // ---------- finishing the tournament ----------
   function checkTournamentEnd() {
     if (state.phaseType === "done") return;
@@ -1042,6 +1080,7 @@
         const bustBtn = document.createElement("button");
         bustBtn.className = "small-btn"; bustBtn.textContent = "Bust";
         bustBtn.onclick = () => {
+          snapshotForUndo();
           p.status = "busted";
           const stillActive = state.players.filter(x => x.status === "active").length;
           p.place = stillActive + 1;
@@ -1052,18 +1091,19 @@
         if (canTopOff) {
           const topOffBtn = document.createElement("button");
           topOffBtn.className = "small-btn"; topOffBtn.textContent = "Top off";
-          topOffBtn.onclick = () => { p.toppedOff = true; save(); renderLivePlayers(); renderLivePayouts(); };
+          topOffBtn.onclick = () => { snapshotForUndo(); p.toppedOff = true; save(); renderLivePlayers(); renderLivePayouts(); };
           actions.appendChild(topOffBtn);
         }
       } else if (canRebuy) {
         const rebuyBtn = document.createElement("button");
         rebuyBtn.className = "small-btn"; rebuyBtn.textContent = "Rebuy";
-        rebuyBtn.onclick = () => { p.status = "active"; p.rebuys += 1; p.place = null; save(); renderLivePlayers(); renderLivePayouts(); };
+        rebuyBtn.onclick = () => { snapshotForUndo(); p.status = "active"; p.rebuys += 1; p.place = null; save(); renderLivePlayers(); renderLivePayouts(); };
         actions.appendChild(rebuyBtn);
       }
       const rmBtn = document.createElement("button");
       rmBtn.className = "small-btn"; rmBtn.textContent = "×"; rmBtn.setAttribute("aria-label","Remove player");
       rmBtn.onclick = () => {
+        snapshotForUndo();
         state.players = state.players.filter(x => x.id !== p.id);
         save(); renderLivePlayers(); renderLivePayouts();
         checkTournamentEnd();
@@ -1076,8 +1116,10 @@
     $("statRebuys").textContent = state.players.reduce((a,p)=>a+p.rebuys,0);
     $("statTopOffs").textContent = state.players.filter(p=>p.toppedOff).length;
     $("statCollected").textContent = money(currentPool());
+    updateUndoBtn();
   }
   $("liveAddPlayerBtn").onclick = () => addPlayerFromInput($("liveNewPlayerName"));
+  $("undoBtn").onclick = () => undoLastAction();
   $("liveNewPlayerName").addEventListener("keydown", e => { if (e.key==="Enter") { e.preventDefault(); addPlayerFromInput($("liveNewPlayerName")); } });
 
   // ---------- live payouts ----------
