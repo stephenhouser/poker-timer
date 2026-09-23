@@ -291,10 +291,40 @@
           <label>Rebuys allowed through level</label>
           <div class="stepper">
             <button type="button" id="cutoffDown" aria-label="Fewer levels">−</button>
-            <span class="val" id="cutoffVal">6</span>
+            <span class="val" id="cutoffVal">4</span>
             <button type="button" id="cutoffUp" aria-label="More levels">+</button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Top-off</h2>
+      <p class="sub">Let active players pay to add chips to their stack, without having to bust first.</p>
+      <div class="toggle-row" style="margin-bottom:14px;">
+        <span>Allow top-off</span>
+        <button class="switch" id="topOffSwitch" role="switch" aria-checked="true" aria-label="Allow top-off"></button>
+      </div>
+      <div id="topOffFields">
+        <div class="grid2">
+          <div class="field">
+            <label for="topOffCost">Top-off cost ($)</label>
+            <input type="number" id="topOffCost" min="0" step="1" value="20">
+          </div>
+          <div class="field">
+            <label for="topOffChips">Top-off chips</label>
+            <input type="number" id="topOffChips" min="100" step="100" value="10000">
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label>Top-off allowed through level</label>
+          <div class="stepper">
+            <button type="button" id="topOffCutoffDown" aria-label="Fewer levels">−</button>
+            <span class="val" id="topOffCutoffVal">6</span>
+            <button type="button" id="topOffCutoffUp" aria-label="More levels">+</button>
+          </div>
+        </div>
+        <p class="count-note">Each player can top off once.</p>
       </div>
     </div>
 
@@ -375,6 +405,7 @@
           <div><div class="n" id="statActive">0</div><div class="l">Active</div></div>
           <div><div class="n" id="statBusted">0</div><div class="l">Busted</div></div>
           <div><div class="n" id="statRebuys">0</div><div class="l">Rebuys</div></div>
+          <div><div class="n" id="statTopOffs">0</div><div class="l">Top-offs</div></div>
           <div><div class="n" id="statCollected">$0</div><div class="l">Collected</div></div>
         </div>
         <div class="add-player-row">
@@ -483,7 +514,11 @@
     rebuyEnabled: true,
     rebuyCost: 40,
     rebuyStack: 20000,
-    rebuyCutoff: 6,
+    rebuyCutoff: 4,
+    topOffEnabled: true,
+    topOffCost: 20,
+    topOffChips: 10000,
+    topOffCutoff: 6,
     players: [],
     places: 3,
     payoutPercents: generatePayoutPercents(3),
@@ -502,7 +537,9 @@
         name: state.name, buyIn: state.buyIn, startStack: state.startStack, levelLen: state.levelLen,
         breakEvery: state.breakEvery, breakLen: state.breakLen, levels: state.levels,
         rebuyEnabled: state.rebuyEnabled, rebuyCost: state.rebuyCost, rebuyStack: state.rebuyStack,
-        rebuyCutoff: state.rebuyCutoff, players: state.players, places: state.places, payoutPercents: state.payoutPercents
+        rebuyCutoff: state.rebuyCutoff, topOffEnabled: state.topOffEnabled, topOffCost: state.topOffCost,
+        topOffChips: state.topOffChips, topOffCutoff: state.topOffCutoff,
+        players: state.players, places: state.places, payoutPercents: state.payoutPercents
       }));
     } catch(e) {}
   }
@@ -529,6 +566,10 @@
   $("rebuyCost").value = state.rebuyCost;
   $("rebuyStack").value = state.rebuyStack;
   $("cutoffVal").textContent = state.rebuyCutoff;
+  $("topOffSwitch").setAttribute("aria-checked", String(state.topOffEnabled));
+  $("topOffCost").value = state.topOffCost;
+  $("topOffChips").value = state.topOffChips;
+  $("topOffCutoffVal").textContent = state.topOffCutoff;
   $("placesVal").textContent = state.places;
 
   $("tourneyName").oninput = () => { state.name = $("tourneyName").value.trim() || "Poker Tournament Timer"; };
@@ -552,6 +593,17 @@
   $("rebuyStack").oninput = () => { state.rebuyStack = Math.max(100, parseInt($("rebuyStack").value)||100); };
   $("cutoffDown").onclick = () => { state.rebuyCutoff = clamp(state.rebuyCutoff-1,1,state.levels.length); $("cutoffVal").textContent = state.rebuyCutoff; };
   $("cutoffUp").onclick   = () => { state.rebuyCutoff = clamp(state.rebuyCutoff+1,1,state.levels.length); $("cutoffVal").textContent = state.rebuyCutoff; };
+
+  $("topOffSwitch").onclick = () => {
+    state.topOffEnabled = !state.topOffEnabled;
+    $("topOffSwitch").setAttribute("aria-checked", String(state.topOffEnabled));
+    $("topOffFields").style.opacity = state.topOffEnabled ? "1" : "0.4";
+    $("topOffFields").style.pointerEvents = state.topOffEnabled ? "auto" : "none";
+  };
+  $("topOffCost").oninput = () => { state.topOffCost = Math.max(0, parseFloat($("topOffCost").value)||0); };
+  $("topOffChips").oninput = () => { state.topOffChips = Math.max(100, parseInt($("topOffChips").value)||100); };
+  $("topOffCutoffDown").onclick = () => { state.topOffCutoff = clamp(state.topOffCutoff-1,1,state.levels.length); $("topOffCutoffVal").textContent = state.topOffCutoff; };
+  $("topOffCutoffUp").onclick   = () => { state.topOffCutoff = clamp(state.topOffCutoff+1,1,state.levels.length); $("topOffCutoffVal").textContent = state.topOffCutoff; };
 
   function renderLevelsTable() {
     const body = $("levelsBody");
@@ -612,7 +664,7 @@
   function addPlayerFromInput(inputEl) {
     const name = inputEl.value.trim();
     if (!name) return;
-    state.players.push({id: uid(), name: name, status: "active", rebuys: 0, place: null});
+    state.players.push({id: uid(), name: name, status: "active", rebuys: 0, place: null, toppedOff: false});
     inputEl.value = "";
     renderPlayerList(); renderPoolPreview();
     if (!$("liveFlow").hidden) renderLivePlayers();
@@ -625,7 +677,8 @@
   function currentPool() {
     const buyins = state.players.length * state.buyIn;
     const rebuys = state.players.reduce((a,p) => a + p.rebuys, 0) * state.rebuyCost;
-    return buyins + rebuys;
+    const topOffs = state.players.filter(p => p.toppedOff).length * state.topOffCost;
+    return buyins + rebuys + topOffs;
   }
   function renderPoolPreview() {
     $("poolPreview").textContent = "Estimated pool with current roster: " + money(currentPool());
@@ -929,9 +982,11 @@
       const row = document.createElement("div");
       row.className = "player-row";
       const canRebuy = state.rebuyEnabled && p.status === "busted" && (state.currentLevelIdx+1) <= state.rebuyCutoff && state.phaseType !== "done";
-      const paid = state.buyIn + p.rebuys * state.rebuyCost;
+      const canTopOff = state.topOffEnabled && p.status === "active" && !p.toppedOff && (state.currentLevelIdx+1) <= state.topOffCutoff && state.phaseType !== "done";
+      const paid = state.buyIn + p.rebuys * state.rebuyCost + (p.toppedOff ? state.topOffCost : 0);
       const metaBits = [money(paid) + " paid"];
       if (p.rebuys) metaBits.push(p.rebuys + " rebuy" + (p.rebuys>1?"s":""));
+      if (p.toppedOff) metaBits.push("topped off");
       if (p.status === "busted" && p.place) metaBits.push("finished " + ordinal(p.place));
       row.innerHTML =
         '<div style="flex:1;text-align:left;">' +
@@ -952,6 +1007,12 @@
           checkTournamentEnd();
         };
         actions.appendChild(bustBtn);
+        if (canTopOff) {
+          const topOffBtn = document.createElement("button");
+          topOffBtn.className = "small-btn"; topOffBtn.textContent = "Top off";
+          topOffBtn.onclick = () => { p.toppedOff = true; save(); renderLivePlayers(); renderLivePayouts(); };
+          actions.appendChild(topOffBtn);
+        }
       } else if (canRebuy) {
         const rebuyBtn = document.createElement("button");
         rebuyBtn.className = "small-btn"; rebuyBtn.textContent = "Rebuy";
@@ -971,6 +1032,7 @@
     $("statActive").textContent = state.players.filter(p=>p.status==="active").length;
     $("statBusted").textContent = state.players.filter(p=>p.status==="busted").length;
     $("statRebuys").textContent = state.players.reduce((a,p)=>a+p.rebuys,0);
+    $("statTopOffs").textContent = state.players.filter(p=>p.toppedOff).length;
     $("statCollected").textContent = money(currentPool());
   }
   $("liveAddPlayerBtn").onclick = () => addPlayerFromInput($("liveNewPlayerName"));
@@ -980,9 +1042,12 @@
   function renderLivePayouts() {
     const pool = currentPool();
     $("poolAmt").textContent = money(pool);
-    $("poolLbl").textContent = state.players.length + " buy-in" + (state.players.length!==1?"s":"") +
-      (state.players.reduce((a,p)=>a+p.rebuys,0) ? " + " + state.players.reduce((a,p)=>a+p.rebuys,0) + " rebuy" + (state.players.reduce((a,p)=>a+p.rebuys,0)>1?"s":"") : "") +
-      " · prize pool";
+    const rebuyCount = state.players.reduce((a,p)=>a+p.rebuys,0);
+    const topOffCount = state.players.filter(p=>p.toppedOff).length;
+    let poolLblParts = [state.players.length + " buy-in" + (state.players.length!==1?"s":"")];
+    if (rebuyCount) poolLblParts.push(rebuyCount + " rebuy" + (rebuyCount>1?"s":""));
+    if (topOffCount) poolLblParts.push(topOffCount + " top-off" + (topOffCount>1?"s":""));
+    $("poolLbl").textContent = poolLblParts.join(" + ") + " · prize pool";
     const list = $("livePayoutsList");
     list.innerHTML = "";
     state.payoutPercents.forEach((pct, i) => {
