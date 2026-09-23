@@ -357,6 +357,9 @@
 
     <button class="primary-btn" id="startBtn">Start tournament</button>
     <p class="footnote">All timing happens in this browser tab — keep it open while the clock runs.</p>
+    <div style="text-align:center;">
+      <button class="link-btn" id="resetAllBtn" style="color:var(--text-dim);">Reset all to defaults</button>
+    </div>
   </section>
 
   <!-- ================= LIVE ================= -->
@@ -503,25 +506,29 @@
   }
 
   // ---------- state ----------
-  const state = {
-    name: "Poker Tournament Timer",
-    buyIn: 40,
-    startStack: 20000,
-    levelLen: 15*60,
-    breakEvery: 4,
-    breakLen: 10*60,
-    levels: generateLevels(12),
-    rebuyEnabled: true,
-    rebuyCost: 40,
-    rebuyStack: 20000,
-    rebuyCutoff: 4,
-    topOffEnabled: true,
-    topOffCost: 20,
-    topOffChips: 10000,
-    topOffCutoff: 6,
-    players: [],
-    places: 3,
-    payoutPercents: generatePayoutPercents(3),
+  function getDefaults() {
+    return {
+      name: "Poker Tournament Timer",
+      buyIn: 40,
+      startStack: 20000,
+      levelLen: 15*60,
+      breakEvery: 4,
+      breakLen: 10*60,
+      levels: generateLevels(12),
+      rebuyEnabled: true,
+      rebuyCost: 40,
+      rebuyStack: 20000,
+      rebuyCutoff: 4,
+      topOffEnabled: true,
+      topOffCost: 20,
+      topOffChips: 10000,
+      topOffCutoff: 6,
+      players: [],
+      places: 3,
+      payoutPercents: generatePayoutPercents(3)
+    };
+  }
+  const state = Object.assign(getDefaults(), {
     // runtime
     phaseType: "level", // level | break | done
     currentLevelIdx: 0,
@@ -529,7 +536,7 @@
     running: false,
     tickHandle: null,
     activeTab: "players"
-  };
+  });
 
   function save() {
     try {
@@ -556,21 +563,32 @@
   // =========================================================
   // SETUP SCREEN
   // =========================================================
-  $("tourneyName").value = state.name === "Poker Tournament Timer" ? "" : state.name;
-  $("buyIn").value = state.buyIn;
-  $("startStack").value = state.startStack;
-  $("levelLenVal").textContent = fmt(state.levelLen);
-  $("breakEveryVal").textContent = state.breakEvery;
-  $("breakLenVal").textContent = fmt(state.breakLen);
-  $("rebuySwitch").setAttribute("aria-checked", String(state.rebuyEnabled));
-  $("rebuyCost").value = state.rebuyCost;
-  $("rebuyStack").value = state.rebuyStack;
-  $("cutoffVal").textContent = state.rebuyCutoff;
-  $("topOffSwitch").setAttribute("aria-checked", String(state.topOffEnabled));
-  $("topOffCost").value = state.topOffCost;
-  $("topOffChips").value = state.topOffChips;
-  $("topOffCutoffVal").textContent = state.topOffCutoff;
-  $("placesVal").textContent = state.places;
+  function refreshSetupUI() {
+    $("tourneyName").value = state.name === "Poker Tournament Timer" ? "" : state.name;
+    $("buyIn").value = state.buyIn;
+    $("startStack").value = state.startStack;
+    $("levelLenVal").textContent = fmt(state.levelLen);
+    $("breakEveryVal").textContent = state.breakEvery;
+    $("breakLenVal").textContent = fmt(state.breakLen);
+    $("rebuySwitch").setAttribute("aria-checked", String(state.rebuyEnabled));
+    $("rebuyCost").value = state.rebuyCost;
+    $("rebuyStack").value = state.rebuyStack;
+    $("cutoffVal").textContent = state.rebuyCutoff;
+    $("rebuyFields").style.opacity = state.rebuyEnabled ? "1" : "0.4";
+    $("rebuyFields").style.pointerEvents = state.rebuyEnabled ? "auto" : "none";
+    $("topOffSwitch").setAttribute("aria-checked", String(state.topOffEnabled));
+    $("topOffCost").value = state.topOffCost;
+    $("topOffChips").value = state.topOffChips;
+    $("topOffCutoffVal").textContent = state.topOffCutoff;
+    $("topOffFields").style.opacity = state.topOffEnabled ? "1" : "0.4";
+    $("topOffFields").style.pointerEvents = state.topOffEnabled ? "auto" : "none";
+    $("placesVal").textContent = state.places;
+    renderLevelsTable();
+    renderPlayerList();
+    renderPoolPreview();
+    renderPayoutRows();
+  }
+  refreshSetupUI();
 
   $("tourneyName").oninput = () => { state.name = $("tourneyName").value.trim() || "Poker Tournament Timer"; };
   $("buyIn").oninput = () => { state.buyIn = Math.max(0, parseFloat($("buyIn").value) || 0); renderPoolPreview(); };
@@ -746,6 +764,30 @@
   // ---------- new tournament (reset players + progress, keep configured structure) ----------
   let newTourneyArmed = false;
   let newTourneyTimeout = null;
+  let resetAllArmed = false;
+  let resetAllTimeout = null;
+  $("resetAllBtn").onclick = () => {
+    if (!resetAllArmed) {
+      resetAllArmed = true;
+      $("resetAllBtn").textContent = "Click again to confirm — wipes all settings";
+      $("resetAllBtn").style.color = "var(--danger)";
+      clearTimeout(resetAllTimeout);
+      resetAllTimeout = setTimeout(() => {
+        resetAllArmed = false;
+        $("resetAllBtn").textContent = "Reset all to defaults";
+        $("resetAllBtn").style.color = "var(--text-dim)";
+      }, 3000);
+      return;
+    }
+    clearTimeout(resetAllTimeout);
+    resetAllArmed = false;
+    $("resetAllBtn").textContent = "Reset all to defaults";
+    $("resetAllBtn").style.color = "var(--text-dim)";
+    Object.assign(state, getDefaults());
+    try { localStorage.removeItem("ptt_state"); } catch(e) {}
+    refreshSetupUI();
+  };
+
   $("newTourneyBtn").onclick = () => {
     if (!newTourneyArmed) {
       newTourneyArmed = true;
